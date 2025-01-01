@@ -1,0 +1,50 @@
+resource "azurerm_servicebus_namespace" "this" {
+  name                = var.name
+  location            = var.rg.location
+  resource_group_name = var.rg.name
+  sku                 = var.sku
+  capacity            = var.capacity
+  tags                = var.tags
+
+  lifecycle {
+    ignore_changes = [
+      tags["business_unit"],
+      tags["environment"],
+      tags["product"],
+      tags["subscription_type"],
+      tags["environment_finops"]
+    ]
+  }
+}
+
+module "queues" {
+  source                                  = "app.terraform.io/ptonini-org/service-bus-queue/azurerm"
+  version                                 = "~> 1.0.0"
+  for_each                                = var.queues
+  name                                    = each.key
+  namespace_id                            = azurerm_servicebus_namespace.this.id
+  lock_duration                           = each.value.lock_duration
+  max_size_in_megabytes                   = each.value.max_size_in_megabytes
+  requires_duplicate_detection            = each.value.requires_duplicate_detection
+  requires_session                        = each.value.requires_session
+  default_message_ttl                     = each.value.default_message_ttl
+  dead_lettering_on_message_expiration    = each.value.dead_lettering_on_message_expiration
+  duplicate_detection_history_time_window = each.value.duplicate_detection_history_time_window
+  max_delivery_count                      = each.value.max_delivery_count
+  auto_delete_on_idle                     = each.value.auto_delete_on_idle
+}
+
+module "topics" {
+  source                                  = "app.terraform.io/ptonini-org/service-bus-topic/azurerm"
+  version                                 = "~> 1.0.0"
+  for_each                                = var.topics
+  name                                    = each.key
+  namespace_id                            = azurerm_servicebus_namespace.this.id
+  subscriptions                           = each.value.subscriptions
+  auto_delete_on_idle                     = each.value.auto_delete_on_idle
+  default_message_ttl                     = each.value.default_message_ttl
+  duplicate_detection_history_time_window = each.value.duplicate_detection_history_time_window
+  max_size_in_megabytes                   = each.value.max_size_in_megabytes
+  requires_duplicate_detection            = each.value.requires_duplicate_detection
+  support_ordering                        = each.value.support_ordering
+}
